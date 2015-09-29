@@ -19,10 +19,16 @@ var playback = require('../../main/playback'),
 describe('Mixtube Playback', function() {
 
   var _stageElmt,
-    _entries = Object.freeze(
-      ['0KSOMA3QBU0', 'NUsoVlDFqZg', 'o3mP3mJDL2k', '7-7knsP2n5w', 'hiP14ED28CA', '2vjPBrBU-TM']
+    //_entries = Object.freeze(
+    //  ['0KSOMA3QBU0', 'NUsoVlDFqZg', 'o3mP3mJDL2k', '7-7knsP2n5w', 'hiP14ED28CA', '2vjPBrBU-TM']
+    //    .map(function(videoId) {
+    //      return {id: videoId, provider: 'youtube'};
+    //    }));
+    //
+  _entries = Object.freeze(
+      ['24156386']
         .map(function(videoId) {
-          return {id: videoId, provider: 'youtube'};
+          return {id: videoId, provider: 'vimeo'};
         }));
 
   function buildNextEntryProducer(entries) {

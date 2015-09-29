@@ -1,6 +1,7 @@
 'use strict';
 
 var playerYoutube = require('./playerYoutube'),
+  playerVimeo = require('./playerVimeo'),
   has = require('lodash/object/has');
 
 /**
@@ -33,7 +34,8 @@ function playerFactory(config) {
   /** @type {playbackConfig} */
   var _config = config,
     _playersFactories = {
-      youtube: playerYoutube
+      youtube: playerYoutube,
+      vimeo: playerVimeo
     };
 
   function canCreatePlayer(provider) {
