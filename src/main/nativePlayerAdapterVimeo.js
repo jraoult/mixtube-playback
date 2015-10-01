@@ -2,8 +2,6 @@
 
 var EventEmitter = require('events').EventEmitter;
 
-var VIMEO_ORIGIN_REGEXP = /^https?:\/\/player.vimeo.com/;
-
 function createElement(html) {
   var div = document.createElement('div');
   div.innerHTML = html;
@@ -42,15 +40,38 @@ function buildIFrame(elementProducer) {
  */
 function nativePlayerAdapterVimeo(config) {
 
-  var _emitter = new EventEmitter(),
-    _playerOrigin = '*',
-    _iFrame = buildIFrame(config.elementProducer),
-    _currentTime,
-    _duration,
-    _volume;
+  function loadPlayerInIFrame(id) {
+    return new Promise(function(resolve, reject) {
 
-  // prepares for the next fade in animation and avoids FOUC
-  _iFrame.style.opacity = 0;
+      function unbindAfterSettled() {
+        _iFrame.removeEventListener('load', onIFrameLoaded);
+        _emitter.removeListener('ready', onPlayerReady);
+      }
+
+      function onPlayerReady() {
+        ready = true;
+        unbindAfterSettled();
+        resolve();
+      }
+
+      function onIFrameLoaded() {
+        // if not ready after iframe load event it means there was an error
+        if (!ready) {
+          unbindAfterSettled();
+          reject(new Error('An error occurred while loading the Vimeo video ' + id));
+        }
+      }
+
+      var ready = false;
+
+      // wait for the ready event, if it doesn't happen in a short amount of time it means there was an error
+      _emitter.on('ready', onPlayerReady);
+
+      // iframe always trigger onload even on error, that it why we need to do the heck on player ready event
+      _iFrame.src = 'https://player.vimeo.com/video/' + id + '?api=1';
+      _iFrame.addEventListener('load', onIFrameLoaded);
+    });
+  }
 
   function postMessage(action, value) {
     var data = {
@@ -64,23 +85,29 @@ function nativePlayerAdapterVimeo(config) {
     _iFrame.contentWindow.postMessage(data, _playerOrigin);
   }
 
-  function onMessageReceived(postMessageEvent) {
-    // check it is coming from the right frame / origin
-    if (postMessageEvent.source === _iFrame.contentWindow && VIMEO_ORIGIN_REGEXP.test(postMessageEvent.origin)) {
-
-      if (_playerOrigin === '*') {
-        _playerOrigin = postMessageEvent.origin;
-      }
-
-      var postMessageData = JSON.parse(postMessageEvent.data);
-      _emitter.emit(postMessageData.event, postMessageData.data);
-    }
-  }
-
   function init() {
-    window.addEventListener('message', onMessageReceived);
 
-    _emitter.once('ready', function onReady() {
+    function onMessageReceived(postMessageEvent) {
+      // check it is coming from the right frame / origin
+      if (postMessageEvent.source === _iFrame.contentWindow && VIMEO_ORIGIN_REGEXP.test(postMessageEvent.origin)) {
+
+        if (_playerOrigin === '*') {
+          _playerOrigin = postMessageEvent.origin;
+        }
+
+        var postMessageData = JSON.parse(postMessageEvent.data);
+        _emitter.emit(postMessageData.event, postMessageData.data);
+      }
+    }
+
+    _iFrame = buildIFrame(config.elementProducer);
+
+    // prepares for the next fade in animation and avoids FOUC
+    _iFrame.style.opacity = 0;
+
+    global.addEventListener('message', onMessageReceived);
+
+    _emitter.on('ready', function onReady() {
       postMessage('addEventListener', 'playProgress');
       postMessage('addEventListener', 'loadProgress');
     });
@@ -90,11 +117,21 @@ function nativePlayerAdapterVimeo(config) {
     });
 
     return function dispose() {
-      window.removeEventListener('message', onMessageReceived);
+      global.removeEventListener('message', onMessageReceived);
+      _emitter.removeAllListeners(['ready', 'playProgress']);
     };
   }
 
-  init();
+  var VIMEO_ORIGIN_REGEXP = /^https?:\/\/player.vimeo.com/;
+
+  var _emitter = new EventEmitter(),
+    _playerOrigin = '*',
+    _iFrame,
+    _currentTime,
+    _duration,
+    _volume;
+
+  var _disposeFn = init();
 
   return {
     /**
@@ -102,37 +139,27 @@ function nativePlayerAdapterVimeo(config) {
      * @returns {Promise} a promise when ready
      */
     loadVideoById: function(id) {
-      _iFrame.src = 'https://player.vimeo.com/video/' + id + '?api=1';
       _duration = null;
       _currentTime = 0;
       _volume = 0;
 
-      return new Promise(function loadPromiseExecutor(resolve, reject) {
+      return loadPlayerInIFrame(id)
+        .then(function onPlayerIFrame() {
+          return new Promise(function(resolve) {
+            // initialize duration info
+            _emitter.once('loadProgress', function onFirstLoadProgress(evt) {
+              _duration = evt.duration;
+            });
 
-        function onReady() {
-
-          // initialize duration info
-          _emitter.once('loadProgress', function onFirstLoadProgress(evt) {
-            _duration = evt.duration;
+            // force preloading
+            postMessage('setVolume', '0');
+            postMessage('play');
+            _emitter.once('playProgress', function onFirstPlayProgress() {
+              postMessage('pause');
+              resolve();
+            });
           });
-
-          // force preloading
-          postMessage('setVolume', '0');
-          postMessage('play');
-          _emitter.once('playProgress', function onFirstPlayProgress() {
-            postMessage('pause');
-            resolve();
-          });
-        }
-
-        function onError(evt) {
-          reject(new Error('An error with code ' + evt.data + ' occurred while loading the YouTube video ' + id));
-        }
-
-        _emitter.once('error', onError);
-
-        _emitter.once('ready', onReady);
-      });
+        });
     },
     playVideo: function() {
       postMessage('play');
@@ -143,6 +170,8 @@ function nativePlayerAdapterVimeo(config) {
     stopVideo: function() {
       postMessage('pause');
     },
+
+    dispose: _disposeFn,
 
     get volume() {
       return _volume;
