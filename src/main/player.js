@@ -2,30 +2,52 @@
 
 var animationGroup = require('./animationGroup'),
   animationFade = require('./animationFade'),
-  isNumber = require('lodash/lang/isNumber'),
-  playerAdapterVimeo = require('./nativePlayerAdapterVimeo');
+  isNumber = require('lodash/lang/isNumber');
 
 /**
- * Creates a PlayerVimeo instance.
- *
- * @param {{elementProducer: function(): Element, debug: {duration: number, quality: string}}} config
- * @returns {PlayerVimeo}
+ * @typedef {Object} NativePlayerAdapter
+ * @property {function(string): Promise} loadVideoById
+ * @property {function} playVideo
+ * @property {function} pauseVideo
+ * @property {function} stopVideo
+ * @property {function} dispose
+ * @property {number} volume the volume value between 0 and 100
+ * @property {number} currentTime the current playback position in seconds
+ * @property {number} duration the duration in seconds
+ * @property {HTMLIFrameElement} iFrame
  */
-function playerVimeo(config) {
+
+/**
+ * Creates a Player instance.
+ *
+ * @param {{nativePlayerAdapter: NativePlayerAdapter, provider: string, debug: {duration: number}}} config
+ * @returns {Player}
+ */
+function player(config) {
 
   var _config = config,
-    _audioGain = null,
+    _nativePlayerAdapter = _config.nativePlayerAdapter,
     _fadeAnimationGroup = null,
-    _playerAdapter = null;
+    _audioGain = null;
 
   function mute() {
-    _playerAdapter.iFrame.style.opacity = 0;
-    _playerAdapter.volume = 0;
+    _nativePlayerAdapter.iFrame.style.opacity = 0;
+    _nativePlayerAdapter.volume = 0;
   }
 
+  /**
+   * Starts a fade (in / out) animation on the player by altering the opacity and the audio volume.
+   *
+   * If a fade animation was in progress it stops it first and starts fading from the last "values" for opacity
+   * and volume.
+   *
+   * @param {boolean} fadeIn true to fade the player in, false to fade out
+   * @param {number} duration
+   * @returns {Promise}
+   */
   function fade(fadeIn, duration) {
 
-    var iFrameStyle = _playerAdapter.iFrame.style,
+    var iFrameStyle = _nativePlayerAdapter.iFrame.style,
       volumeMax = _audioGain * 100,
       opacityFrom = fadeIn ? 0 : 1,
       volumeFrom = fadeIn ? 0 : volumeMax;
@@ -35,7 +57,7 @@ function playerVimeo(config) {
       _fadeAnimationGroup.stop();
       // parse to float to avoid problems in Shifty
       opacityFrom = parseFloat(iFrameStyle.opacity);
-      volumeFrom = _playerAdapter.volume;
+      volumeFrom = _nativePlayerAdapter.volume;
     }
 
     _fadeAnimationGroup = animationGroup({
@@ -55,7 +77,7 @@ function playerVimeo(config) {
           from: volumeFrom,
           to: fadeIn ? volumeMax : 0,
           step: function(value) {
-            _playerAdapter.volume = value;
+            _nativePlayerAdapter.volume = value;
           }
         })
       }
@@ -77,13 +99,8 @@ function playerVimeo(config) {
       });
   }
 
-
   function loadById(id) {
-    if (!_playerAdapter) {
-      _playerAdapter = playerAdapterVimeo({elementProducer: _config.elementProducer});
-    }
-
-    return _playerAdapter.loadVideoById(id);
+    return _nativePlayerAdapter.loadVideoById(id);
   }
 
   /**
@@ -94,21 +111,25 @@ function playerVimeo(config) {
       throw new TypeError('A configuration object is expected but found ' + config);
     }
     _audioGain = isNumber(config.audioGain) ? config.audioGain : 1;
-    _playerAdapter.playVideo();
+    _nativePlayerAdapter.playVideo();
   }
 
   function pause() {
     if (_fadeAnimationGroup) {
       _fadeAnimationGroup.pause();
     }
-    _playerAdapter.pauseVideo();
+    _nativePlayerAdapter.pauseVideo();
   }
 
   function resume() {
-    _playerAdapter.playVideo();
+    _nativePlayerAdapter.playVideo();
     if (_fadeAnimationGroup) {
       _fadeAnimationGroup.resume();
     }
+  }
+
+  function stop() {
+    _nativePlayerAdapter.stopVideo();
   }
 
   /**
@@ -126,23 +147,24 @@ function playerVimeo(config) {
     return fade(false, config.duration);
   }
 
-  function stop() {
-    _playerAdapter.stopVideo();
-  }
-
   /**
-   * @typedef PlayerVimeo
-   * @name PlayerVimeo
+   * @typedef Player
+   * @name Player
    */
-  var PlayerVimeo = {
+  var Player = {
     get provider() {
-      return 'vimeo';
+      return _config.provider;
     },
     get currentTime() {
-      return _playerAdapter.currentTime;
+      return _nativePlayerAdapter.currentTime;
     },
     get duration() {
-      return _playerAdapter.duration;
+      var realDuration = _nativePlayerAdapter.duration;
+      if (_config.debug.duration < 0) {
+        return realDuration;
+      } else {
+        return Math.min(_config.debug.duration, realDuration);
+      }
     },
     loadById: loadById,
     play: play,
@@ -153,8 +175,7 @@ function playerVimeo(config) {
     fadeOut: fadeOut
   };
 
-  return Object.freeze(PlayerVimeo);
-
+  return Object.freeze(Player);
 }
 
-module.exports = playerVimeo;
+module.exports = player;

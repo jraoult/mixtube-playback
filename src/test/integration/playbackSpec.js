@@ -19,17 +19,21 @@ var playback = require('../../main/playback'),
 describe('Mixtube Playback', function() {
 
   var _stageElmt,
-    _entries = Object.freeze(
-      ['0KSOMA3QBU0']
-        .map(function(videoId) {
-          return {id: videoId, provider: 'youtube'};
-        }));
+    _youtubeEntries = Object.freeze(
+    ['0KSOMA3QBU0', 'NUsoVlDFqZg', 'o3mP3mJDL2k', '7-7knsP2n5w', 'hiP14ED28CA']
+      .map(function(videoId) {
+        return {id: videoId, provider: 'youtube'};
+      })),
+    _vimeoEntries = Object.freeze(['73750290', '115776259', '133697756', '33716408', '73386596']
+      .map(function(videoId) {
+        return {id: videoId, provider: 'vimeo'};
+      })),
+    _entries = [];
 
-  _entries = _entries.concat(Object.freeze(
-      ['24156386']
-        .map(function(videoId) {
-          return {id: videoId, provider: 'vimeo'};
-        })));
+  _youtubeEntries.forEach(function(entry, idx) {
+    _entries.push(entry);
+    _entries.push(_vimeoEntries[idx]);
+  });
 
   function buildNextEntryProducer(entries) {
     return function arrayBasedNextEntryProducer(entry) {

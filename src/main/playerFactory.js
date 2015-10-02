@@ -1,7 +1,8 @@
 'use strict';
 
-var playerYoutube = require('./playerYoutube'),
-  playerVimeo = require('./playerVimeo'),
+var nativePlayerAdapterYoutube = require('./nativePlayerAdapterYoutube'),
+  nativePlayerAdapterVimeo = require('./nativePlayerAdapterVimeo'),
+  player = require('./player'),
   has = require('lodash/object/has');
 
 /**
@@ -31,15 +32,15 @@ var playerYoutube = require('./playerYoutube'),
  */
 function playerFactory(config) {
 
-  /** @type {playbackConfig} */
+  /** @type {playerFactoryConfig} */
   var _config = config,
-    _playersFactories = {
-      youtube: playerYoutube,
-      vimeo: playerVimeo
+    _adapterFactories = {
+      youtube: nativePlayerAdapterYoutube,
+      vimeo: nativePlayerAdapterVimeo
     };
 
   function canCreatePlayer(provider) {
-    return has(_playersFactories, provider);
+    return has(_adapterFactories, provider);
   }
 
   /**
@@ -51,11 +52,18 @@ function playerFactory(config) {
       throw new Error('Unsupported provider type ' + provider);
     }
 
-    return _playersFactories[provider]({
+    var adapter = _adapterFactories[provider]({
       elementProducer: _config.elementProducer,
       debug: {
-        duration: _config.debug.duration,
-        quality: _config.debug.quality
+        duration: _config.debug.quality
+      }
+    });
+
+    return player({
+      nativePlayerAdapter: adapter,
+      provider: provider,
+      debug: {
+        duration: _config.debug.duration
       }
     });
   }

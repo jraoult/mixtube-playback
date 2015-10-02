@@ -2,6 +2,8 @@
 
 var EventEmitter = require('events').EventEmitter;
 
+var VIMEO_ORIGIN_REGEXP = /^https?:\/\/player.vimeo.com/;
+
 function createElement(html) {
   var div = document.createElement('div');
   div.innerHTML = html;
@@ -36,9 +38,17 @@ function buildIFrame(elementProducer) {
  * Creates a PlayerAdapter instance for Vimeo.
  *
  * @param {{elementProducer: function(): Element}} config
- * @returns {PlayerAdapter}
+ * @returns {NativePlayerAdapter}
  */
 function nativePlayerAdapterVimeo(config) {
+
+  var _emitter = new EventEmitter(),
+    _playerOrigin = '*',
+    _iFrame,
+    _currentTime,
+    _duration,
+    _volume,
+    _disposeFn;
 
   function loadPlayerInIFrame(id) {
     return new Promise(function(resolve, reject) {
@@ -122,16 +132,7 @@ function nativePlayerAdapterVimeo(config) {
     };
   }
 
-  var VIMEO_ORIGIN_REGEXP = /^https?:\/\/player.vimeo.com/;
-
-  var _emitter = new EventEmitter(),
-    _playerOrigin = '*',
-    _iFrame,
-    _currentTime,
-    _duration,
-    _volume;
-
-  var _disposeFn = init();
+  _disposeFn = init();
 
   return {
     /**
