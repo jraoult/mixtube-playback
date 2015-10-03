@@ -145,21 +145,29 @@ function nativePlayerAdapterVimeo(config) {
       _volume = 0;
 
       return loadPlayerInIFrame(id)
-        .then(function onPlayerIFrame() {
-          return new Promise(function(resolve) {
+        .then(function onPlayerReady() {
+
+          var durationAvailablePromise = new Promise(function(resolve) {
             // initialize duration info
             _emitter.once('loadProgress', function onFirstLoadProgress(evt) {
               _duration = evt.duration;
+              resolve();
             });
+          });
 
+          var canPlayPromise = new Promise(function(resolve) {
             // force preloading
-            postMessage('setVolume', '0');
             postMessage('play');
             _emitter.once('playProgress', function onFirstPlayProgress() {
               postMessage('pause');
               resolve();
             });
           });
+
+          // make sure there will not be any audio glitches
+          postMessage('setVolume', '0');
+
+          return Promise.all([durationAvailablePromise, canPlayPromise]);
         });
     },
     playVideo: function() {
