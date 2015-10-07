@@ -173,7 +173,7 @@ function nativePlayerAdapterYoutube(config) {
     get duration() {
       return _ytPlayer.getDuration();
     },
-    get iFrame() {
+    get htmlElement() {
       return _ytPlayer.getIframe();
     }
   };

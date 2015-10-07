@@ -196,7 +196,7 @@ function nativePlayerAdapterVimeo(config) {
     get duration() {
       return _duration;
     },
-    get iFrame() {
+    get htmlElement() {
       return _iFrame;
     }
   };

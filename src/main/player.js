@@ -14,7 +14,7 @@ var animationGroup = require('./animationGroup'),
  * @property {number} volume the volume value between 0 and 100
  * @property {number} currentTime the current playback position in seconds
  * @property {number} duration the duration in seconds
- * @property {HTMLIFrameElement} iFrame
+ * @property {HTMLElement} htmlElement
  */
 
 /**
@@ -31,7 +31,7 @@ function player(config) {
     _audioGain = null;
 
   function mute() {
-    _nativePlayerAdapter.iFrame.style.opacity = 0;
+    _nativePlayerAdapter.htmlElement.style.opacity = 0;
     _nativePlayerAdapter.volume = 0;
   }
 
@@ -47,7 +47,7 @@ function player(config) {
    */
   function fade(fadeIn, duration) {
 
-    var iFrameStyle = _nativePlayerAdapter.iFrame.style,
+    var elementStyle = _nativePlayerAdapter.htmlElement.style,
       volumeMax = _audioGain * 100,
       opacityFrom = fadeIn ? 0 : 1,
       volumeFrom = fadeIn ? 0 : volumeMax;
@@ -56,7 +56,7 @@ function player(config) {
       // a fade animation was in progress so we stop it to start a new one
       _fadeAnimationGroup.stop();
       // parse to float to avoid problems in Shifty
-      opacityFrom = parseFloat(iFrameStyle.opacity);
+      opacityFrom = parseFloat(elementStyle.opacity);
       volumeFrom = _nativePlayerAdapter.volume;
     }
 
@@ -68,7 +68,7 @@ function player(config) {
           from: opacityFrom,
           to: fadeIn ? 1 : 0,
           step: function(value) {
-            iFrameStyle.opacity = value;
+            elementStyle.opacity = value;
           }
         }),
         volume: animationFade({
